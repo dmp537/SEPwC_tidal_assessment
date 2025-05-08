@@ -114,9 +114,43 @@ def read_tidal_data(filename):
         return pd.DataFrame()
 
 def extract_single_year_remove_mean(year, data):
-   
+    """
+    Extract data for a specific date range and remove the mean sea level.
 
-    return 
+    Parameters
+    ----------
+    year (str): Year to extract 
+    data (pandas.DataFrame): DataFrame containing tidal data with datetime index
+    
+    Returns
+    -------
+    pandas.DataFrame: DataFrame with sea level for the specified year,
+                      with mean sea level removed
+
+    """
+    try:
+        # Convert year to integer for filtering
+        year_int = int(year)
+        
+        # Extract data for the specified year
+        year_data = data[data.index.year == year_int]
+        
+        if year_data.empty:
+            print(f"No data found for year {year}")
+            return pd.DateFrame(columns=data.columns)
+        
+        # Calculate mean sea level
+        mean_sea_level = year_data['Sea Level'].mean()
+        
+        # Remove mean sea level
+        year_data_zero_mean = year_data.copy()
+        year_data_zero_mean['Sea Level'] -= mean_sea_level
+        
+        return year_data_zero_mean
+    
+    except Exception as e:
+        print(f"Error extracting year {year}: {e}")
+        return pd.DataFrame(columns=data.columns)
 
 
 def extract_section_remove_mean(start, end, data):
