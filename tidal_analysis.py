@@ -154,9 +154,54 @@ def extract_single_year_remove_mean(year, data):
 
 
 def extract_section_remove_mean(start, end, data):
+    """
+    Extract data for a specific data range and remove the mean sea level.
 
+    Parameters
+    ----------
+    start (str): Start date in format 'YYYYMMDD'
+    end (str): End date in format ' YYYYMMDD'
+    data (pandas.DataFrame): DataFrame containing tidal data with datetime index
 
-    return 
+    Returns
+    -------
+    pandas.DataFrame: DataFrame with sea level data for the specified date range,
+                      with mean sea level removed
+
+    """
+    try:
+        # Convert string dates to datetime objects
+        start_date = pd.to_datetime(start, format='%Y%m%d')
+        end_date = pd.to_datetime(end, format='%Y%m%d')
+        
+        # Add one day to end_date to include the end date in the range
+        end_date = end_date + pd.Timedelta(days=1)
+        
+        # Extract data for the specified date range
+        section_data = data[(data.index >= start_date) & (data.index < end_date)]
+        
+        if section_data.empty:
+            print(f"No data found between {start} and {end}")
+            # Create an empty DataFrame with same columns and DatetimeIndex
+            empty_df = pd.DataFrame(columns=data.columns)
+            empty_df.index = pd.DatetimeIndex([])
+            return empty_df
+        
+        # Calculate mean sea level
+        mean_sea_level = section_data['Sea Level'].mean()
+        
+        # Remove mean sea level
+        section_data_zero_mean = section_data.copy()
+        section_data_zero_mean['Sea Level'] -= mean_sea_level
+        
+        return section_data_zero_mean
+    
+    except Exception as e:
+        print(f"Error extracting section from {start} to {end}: {e}")
+        # Create an empty DataFrame with same colums and DatatimeIndex
+        empty_df = pd.DataFrame(columns=data.columns)
+        empty_df.index = pd.DaretimeIndex([]) 
+        return empty_df
 
 
 def join_data(data1, data2):
