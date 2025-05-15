@@ -336,10 +336,74 @@ def tidal_analysis(data, constituents, start_datetime):
         return [], []
             
 def get_longest_contiguous_data(data):
+    """
+    Find the longest contiguous period without NaN values
 
+    Parameters
+    ----------
+    data (pandas.DataFrame): DataFrame containing tidal data with datetime index
 
-    return 
+    Returns
+    -------
+    pandas.DateFrame: DataFrame containing only the longest contiguous section
 
+    """
+    try:
+        # Check if data is None or empty
+        if data is None or data.empty:
+            # Return an empty DataFrame with the correct structure
+            return pd.DataFrame(columns=['Sea Level'], index=pd.DatetimeIndex([]))
+        
+        # Create a copy of the data to avoid modifying the original
+        data_copy = data.copy()
+        
+        # Check for NaN values
+        is_nan = data_copy['Sea Level'].isna()
+        
+        if not is_nan.any():
+            # If there are no NaN values, return whole dataset
+            return data_copy
+        
+        # Find sequences of non Nan values
+        not_nan = ~is_nan
+        
+        # Initilise varible to track the longest sequence
+        longest_start = 0
+        longest_length = 0
+        current_start = 0
+        current_length = 0
+        
+        # Iterate through the data
+        for i, val in enumerate(not_nan):
+            if val: # If not NaN
+                if current_length == 0:
+                    current_start = i
+                current_length += 1
+            else: # If NaN
+                if current_length > longest_length:
+                    longest_start = current_start
+                    longest_length = current_length
+                current_length = 0
+                
+        # Check if the last sequence is the longest
+        if current_length > longest_length:
+            longest_start = current_start
+            longest_length = current_length 
+            
+        # Extract the longest sequence
+        if longest_length > 0:
+            return data_copy.iloc[longest_start:longest_start + longest_length]
+        else:
+            # Return empty DataFrame with same structure if not valid data
+            return pd.DataFrame(columns=data_copy.columns, index=pd.DatetimeIndex([]))
+
+    except Exception as e:
+        print(f"Error finding longest contiguous data: {e}")
+        # Return empty DataFrame with correct structure
+        return pd.DataFrame(columns=['Sea Level'], index=pd.DatetimeIndex([]))
+    
+    
+        
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
@@ -358,6 +422,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     dirname = args.directory
     verbose = args.verbose
-    
-
-
+      
