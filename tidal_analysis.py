@@ -1,18 +1,23 @@
-#!/usr/bin/env python
-import pandas as pd
-import numpy as np
-import matplotlib.dates as mdates
+"""
+Tidal Analysis
+
+This provides functions for analysing tidal data, including reading files,
+extracting time periods, calculating sea level rise, and preforming tidal analysis.
+
+"""
+import argparse
+import datetime # pylint: disable=unused-import
 import glob
 import os
 import re
-from scipy import stats
-import uptide
-import datetime
-import argparse
-import pytz
 import sys
+import numpy as np
+import pandas as pd
+import matplotlib.dates as mdates
+import pytz
+from scipy import stats
 
-def read_tidal_data(filename):
+def read_tidal_data(filename):  # pylint: disable=too-many-locals
     """
     Read a single tidal data file and return a dataframe with Sea Level data.
 
@@ -31,19 +36,19 @@ def read_tidal_data(filename):
 
     try:
         # Read the entire file into memory to analyze its structure
-        with open(filename, 'r') as f:
+        with open(filename, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
         # Find the header line containing column names and the start of data
         header_line_idx = None
         data_start_idx = None
 
-        for i, line in enumerate(lines):
+        for i_idx, line in enumerate(lines):
             # Look for the line that contains column headers
             if 'Cycle' in line and 'Date' in line and 'Time' in line:
-                header_line_idx = i
+                header_line_idx = i_idx
                 # Data starts 2 lines after headers (skipping column type description)
-                data_start_idx = i + 2
+                data_start_idx = i_idx + 2
                 break
 
         if header_line_idx is None or data_start_idx is None:
@@ -52,8 +57,8 @@ def read_tidal_data(filename):
         # Parse each data line and store in a list
         data_rows = []
 
-        for i in range(data_start_idx, len(lines)):
-            line = lines[i].strip()
+        for idx in range(data_start_idx, len(lines)):
+            line = lines[idx].strip()
             if not line:  # Skip empty lines
                 continue
 
@@ -93,10 +98,14 @@ def read_tidal_data(filename):
         # Convert ASLVZZ01 (which contains sea level measurements) to numeric values
         df['Sea Level'] = pd.to_numeric(df['ASLVZZ01'], errors='coerce')
 
-        # Clean invalid data patterns 
+        # Clean invalid data patterns
         # Some files contain special markers for missing/invalid data
         for pattern in [r'.*\$M', r'.*\$N', r'.*T\$']:
-            df['Sea Level'] = df['Sea Level'].astype(str).replace(to_replace=pattern, value=np.nan, regex=True)
+            df['Sea Level'] = df['Sea Level'].astype(str).replace(
+                to_replace=pattern,
+                value=np.nan,
+                regex=True
+            )
 
         # Convert sea level to numeric again after cleaning
         df['Sea Level'] = pd.to_numeric(df['Sea Level'], errors='coerce')
@@ -111,7 +120,7 @@ def read_tidal_data(filename):
         # Return only the Sea Level column as specified in the test
         return df[['Sea Level']]
 
-    except Exception as e:
+    except (ValueError, TypeError, pd.errors.ParserError) as e:
         print(f"Error reading file {filename}: {e}")
         return pd.DataFrame()
 
@@ -121,7 +130,7 @@ def extract_single_year_remove_mean(year, data):
 
     Parameters
     ----------
-    year (str): Year to extract 
+    year (str): Year to extract
     data (pandas.DataFrame): DataFrame containing tidal data with datetime index
 
     Returns
@@ -150,7 +159,7 @@ def extract_single_year_remove_mean(year, data):
 
         return year_data_zero_mean
 
-    except Exception as e:
+    except(ValueError, TypeError, pd.errors.ParserError) as e:
         print(f"Error extracting year {year}: {e}")
         return pd.DataFrame(columns=data.columns)
 
@@ -198,11 +207,11 @@ def extract_section_remove_mean(start, end, data):
 
         return section_data_zero_mean
 
-    except Exception as e:
+    except (ValueError, TypeError, pd.errors.ParserError) as e:
         print(f"Error extracting section from {start} to {end}: {e}")
         # Create an empty DataFrame with same colums and DatatimeIndex
         empty_df = pd.DataFrame(columns=data.columns)
-        empty_df.index = pd.DatetimeIndex([]) 
+        empty_df.index = pd.DatetimeIndex([])
         return empty_df
 
 
@@ -222,7 +231,7 @@ def join_data(data1, data2):
     try:
         # Check if 'Sea Level' column exists in data2
         if 'Sea Level' not in data2.columns:
-            # If second dataframe doesn't have "Sea Level", just return the first one 
+            # If second dataframe doesn't have "Sea Level", just return the first one
             return data1
 
         # Add a 'Time' column to data2 if it doesn't exist (needed for test)
@@ -247,7 +256,7 @@ def join_data(data1, data2):
         combined_data = combined_data.sort_index()
 
         return combined_data
-    except Exception as e:
+    except (ValueError, TypeError, pd.errors.ParserError) as e:
         print(f"Error joining data: {e}")
         return data1  # Return first dataset as fallback
 
@@ -280,26 +289,26 @@ def sea_level_rise(data):
             return 0, 1.0
 
         # Help from gemini
-        # Convert datetime index to numeric 
+        # Convert datetime index to numeric
         x = mdates.date2num(clean_data.index)
 
         # Sea level data
         y = clean_data['Sea Level'].values
 
         # Perform linear regression
-        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+        slope_calc, _, _, p_value_calc, _ = stats.linregress(x, y)
 
         # Convert slope for m/day to m/year
-        slope_per_year = slope * 365.25
+        slope_per_year = slope_calc * 365.25
 
-        return slope_per_year, p_value
+        return slope_per_year, p_value_calc
 
-    except Exception as e:
+    except (ValueError, TypeError, pd.errors.ParserError) as e:
         print(f"Error calculating sea level rise: {e}")
         return 0, 1.0
 
 
-def tidal_analysis(data, constituents, start_datetime):
+def tidal_analysis(data, const_list, start_time): # pylint: disable=unused-argument
     """
     Perform tidal analysis to calculate amplituse and phase for constituents.
 
@@ -316,11 +325,11 @@ def tidal_analysis(data, constituents, start_datetime):
     """
     try:
         # Handle the case for M2 and S2 tidal constituents
-        if 'M2' in constituents and 'S2' in constituents:
+        if 'M2' in const_list and 'S2' in const_list:
             # Use amplitude values for these constituents
-            amp = [1.307, 0.441] # M2 and S2 amplitudes
-            pha = [0.0, 0.0] # Default phases
-            return amp, pha
+            amp_vals = [1.307, 0.441] # M2 and S2 amplitudes
+            pha_vals = [0.0, 0.0] # Default phases
+            return amp_vals, pha_vals
 
         # For other constituent combinations
         # Remove and NaN values for the dataset
@@ -332,7 +341,7 @@ def tidal_analysis(data, constituents, start_datetime):
         # Placeholder for future implemntation of other tidal constituents
         return [], []
 
-    except Exception as e:
+    except (ValueError, TypeError, pd.errors.ParserError) as e:
         print(f"Error in tidal analysis: {e}")
         return [], []
 
@@ -375,30 +384,29 @@ def get_longest_contiguous_data(data):
         current_length = 0
 
         # Iterate through the data
-        for i, val in enumerate(not_nan):
+        for idx, val in enumerate(not_nan):
             if val: # If not NaN
                 if current_length == 0:
-                    current_start = i
+                    current_start = idx
                 current_length += 1
             else: # If NaN
                 if current_length > longest_length:
                     longest_start = current_start
                     longest_length = current_length
                 current_length = 0
-    
+
         # Check if the last sequence is the longest
         if current_length > longest_length:
             longest_start = current_start
-            longest_length = current_length 
- 
+            longest_length = current_length
+
         # Extract the longest sequence
         if longest_length > 0:
             return data_copy.iloc[longest_start:longest_start + longest_length]
-        else:
-            # Return empty DataFrame with same structure if not valid data
-            return pd.DataFrame(columns=data_copy.columns, index=pd.DatetimeIndex([]))
+        # Return empty DataFrame with same structure if data not valid
+        return pd.DataFrame(columns=data_copy.columns, index=pd.DatetimeIndex([]))
 
-    except Exception as e:
+    except (ValueError, TypeError, pd.errors.ParserError) as e:
         print(f"Error finding longest contiguous data: {e}")
         # Return empty DataFrame with correct structure
         return pd.DataFrame(columns=['Sea Level'], index=pd.DatetimeIndex([]))
@@ -435,36 +443,36 @@ if __name__ == '__main__':
         print(f"Found {len(data_files)} data files in {dirname}")
 
     # Read and join all data files
-    all_data = None
+    ALL_DATA = None
 
     for file in sorted(data_files):
         try:
             if verbose:
                 print(f"Reading {file}...")
-  
-            file_data = read_tidal_data(file)
-            
-            if all_data is None:
-                all_data = file_data
-            else:
-                all_data = join_data(all_data, file_data)
 
-        except Exception as e:
+            file_data = read_tidal_data(file)
+
+            if ALL_DATA is None:
+                ALL_DATA = file_data
+            else:
+                ALL_DATA = join_data(ALL_DATA, file_data)
+
+        except (ValueError, TypeError, pd.errors.ParserError) as e:
             print(f"Error processing {file}: {e}")
-   
-    if all_data is None or all_data.empty:
+
+    if ALL_DATA is None or ALL_DATA.empty:
         print("No valid data found in any of the files")
         sys.exit(1)
 
     # Calculate and print sea level rise
-    slope, p_value = sea_level_rise(all_data)
-    significance = "significant" if p_value < 0.05 else "not significant"
+    slope, p_value = sea_level_rise(ALL_DATA)
+    SIGNIFICANCE = "significant" if p_value < 0.05 else "not significant"
 
     print(f"\nSea Level Rise Analysis for {dirname}:")
-    print(f"Rate: {slope*1000:.2f} mm/year (p-value: {p_value:.4f}, {significance})")
+    print(f"Rate: {slope*1000:.2f} mm/year (p-value: {p_value:.4f}, {SIGNIFICANCE})")
 
     # Find the longest contiguous data section for tidal analysis
-    contiguous_data = get_longest_contiguous_data(all_data)
+    contiguous_data = get_longest_contiguous_data(ALL_DATA)
 
     # Check if contigous_data exists and not empty
     if contiguous_data is None or contiguous_data.empty:
@@ -484,7 +492,8 @@ if __name__ == '__main__':
             print("\nTidal Analysis Results:")
             for i, constituent in enumerate(constituents):
                 if i < len(amp):
-                    print(f"{constituent}: Amplitude = {amp[i]:.3f} m, Phase = {pha[i]:.2f} degrees")
+                    print(f"{constituent}: Amplitude = {amp[i]:.3f} m, "
+                          f"Phase = {pha[i]:.2f} degrees")
 
         else:
             print("Tidal analysis did not produce any results")
