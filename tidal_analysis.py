@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import pandas as pd
 import numpy as np
 import matplotlib.dates as mdates
@@ -10,6 +10,7 @@ import uptide
 import datetime
 import argparse
 import pytz
+import sys
 
 def read_tidal_data(filename):
     """
@@ -422,4 +423,72 @@ if __name__ == '__main__':
     args = parser.parse_args()
     dirname = args.directory
     verbose = args.verbose
+    
+    # Get list of all text files in the directory
+    data_files = glob.glob(os.path.join(dirname, "*"))
+    
+    if not data_files:
+        print(f"No data files found in {dirname}")
+        sys.exit(1)
+        
+    if verbose:
+        print(f"Found {len(data_files)} data files in {dirname}")
+        
+    # Read and join all data files
+    all_data = None
+    
+    for file in sorted(data_files):
+        try:
+            if verbose:
+                print(f"Reading {file}...")
+                
+            file_data = read_tidal_data(file)
+            
+            if all_data is None:
+                all_data = file_data
+            else:
+                all_data = join_data(all_data, file_data)
+        
+        except Exception as e:
+            print(f"Error processing {file}: {e}")
+            
+    if all_data is None or all_data.empty:
+        print("No valid data found in any of the files")
+        sys.exit(1)
+    
+    # Calculate and print sea level rise
+    slope, p_value = sea_level_rise(all_data)
+    significance = "significant" if p_value < 0.05 else "not significant"
+    
+    print(f"\nSea Level Rise Analysis for {dirname}:")
+    print(f"Rate: {slope*1000:.2f} mm/year (p-value: {p_value:.4f}, {significance})")
+    
+    # Find the longest contiguous data section for tidal analysis
+    contiguous_data = get_longest_contiguous_data(all_data)
+    
+    # Check if contigous_data exists and not empty
+    if contiguous_data is None or contiguous_data.empty:
+        print("No contiguous data avalible for tidal analysis")
+    else:
+        # Define tidal constituents for analyse
+        constituents = ['M2', 'S2']
+        
+        # Get start time with UTC timezone
+        start_datetime = contiguous_data.index[0].to_pydatetime()
+        start_datetime = start_datetime.replace(tzinfo=pytz.UTC)
+        
+        # Preform tidal analysis
+        amp, pha = tidal_analysis(contiguous_data, constituents, start_datetime)
+        
+        if amp and pha:
+            print("\nTidal Analysis Results:")
+            for i, constituent in enumerate(constituents):
+                if i < len(amp):
+                    print(f"{constituent}: Amplitude = {amp[i]:.3f} m, Phase = {pha[i]:.2f} degrees")
+                    
+        else:
+            print("Tidal analysis did not produce any results")
+            
+    if verbose:
+        print("\nAnalysis complete.")
       
