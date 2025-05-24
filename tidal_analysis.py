@@ -500,3 +500,131 @@ if __name__ == '__main__':
 
     if verbose:
         print("\nAnalysis complete.")
+
+
+def perform_harmonic_prediction(data, constituents_list, amplitudes, phases, output_file=None):
+    # pylint: disable=too-many-locals
+    """
+    Create tidal predictions based on harmonic analysis results.
+
+    Parameters
+    ----------
+    data (pandas.DataFrame): Original tidal data with datetime index
+    constituents (list): List of tidal constituent names
+    amp (list): Amplitudes corresponding to constituents
+    pha (list): Phases corresponding to constituents
+    output_file (str, optional): Filename to save prediction plot
+
+    Returns
+    -------
+    tuple: (prediction_df, prediction_plot_filename)
+
+    """
+    try:
+        import matplotlib.pyplot as plt  #pylint: disable=import-outside-toplevel
+
+        if not data.empty and amplitudes and phases and len(amplitudes) == len(phases):
+            # Define periods for common tidal constituents in hours
+            # Values came from Gemini
+            constituent_periods = {
+                'M2': 12.4206012,
+                'S2': 12.0,
+                'N2': 12.6583475,
+                'K1': 23.9344721,
+                'O1': 25.8193387,
+                'K2': 11.96723606,
+                'P1': 24.0659,
+                'Q1': 26.8684,
+                'M4': 6.2103006,
+            }
+
+            # Get the latest data in dataset and create prediction period
+            latest_date = data.index[-1]
+            prediction_start, prediction_end = (
+                latest_date + pd.Timedelta(days=1),
+                latest_date + pd.Timedelta(days=31) # 31 to get 30 days total
+            )
+
+            # Create hourly timestamps for prediction
+            prediction_times = pd.date_range(
+                start=prediction_start,
+                end=prediction_end,
+                freq='h' # From Gemini - hourly resolution for predictions
+            )
+
+            # Initialise prediction dataframe
+            prediction_df = pd.DataFrame(index=prediction_times)
+            prediction_df['Sea Level'] = 0.0
+
+            # Mean sea level (before constituent removal)
+            mean_sea_level = data['Sea Level'].mean()
+
+            # Generate prediction by summing harmonics
+            # From Gemini - math apprach for harmonic synthesis in tidal theory
+            for idx, constituent_name in enumerate(constituents_list):
+                # Only process if idx is within the range of amplitudes list
+                if idx < len(amplitudes):
+                    if constituent_name in constituent_periods:
+                        # Convert period to angular frequency (rad/hour)
+                        period = constituent_periods[constituent_name]
+                        omega = 2 * np.pi / period
+
+                        # Time elapsed in hours since start of prediction
+                        hours_elapsed = (
+                            prediction_df.index - prediction_start
+                        ).total_seconds() / 3600
+
+                        # Add this constituent's contribution
+                        # From Gemini - harmonic synthesis formula from tidal theory
+                        prediction_df['Sea Level'] += (
+                            amplitudes[idx] * np.cos(omega * hours_elapsed - phases[idx])
+                        )
+
+            # Add back mean sea level
+            prediction_df['Sea Level'] += mean_sea_level
+
+            # Plot the prediction if output_file is provided
+            if output_file:
+                fig, ax = plt.subplots(figsize=(12, 6))
+
+                # Plot the prediction
+                ax.plot(prediction_df.index, prediction_df['Sea Level'], 'g-',
+                        linewidth=1.2, label='Prediction')
+
+                # Plot the original data (last 7 days to compare)
+                # From Gemini - 7-day comparison window
+                last_week = data.loc[latest_date - pd.Timedelta(days=7):latest_date]
+                if not last_week.empty:
+                    ax.plot(last_week.index, last_week['Sea Level'], 'b-',
+                            linewidth=0.8, alpha=0.7, label='Observed')
+
+                # Add a vertical line to separate observed and predicted data
+                # From Gemini - design to show transition point
+                ax.axvline(x=latest_date, color='r', linestyle='--', alpha=0.7,
+                           label='Prediction Start')
+
+                # Format the plot
+                ax.set_title('Tidal Prediction Based on Harmonic Analysis', fontsize=14)
+                ax.set_xlabel('Date', fontsize=12)
+                ax.set_ylabel('Sea Level (m)', fontsize=12)
+                ax.grid(True, alpha=0.3)
+                ax.legend(loc='best')
+
+                # Format x-axis dates
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+                plt.xticks(rotation=45)
+
+                # Layout and save
+                plt.tight_layout()
+                plt.savefig(output_file)
+                plt.close(fig)
+
+                return prediction_df, output_file
+
+            return prediction_df, None
+
+        return None, None
+
+    except Exception as error: # pylint: disable=broad-exception-caught
+        print(f"Error generating prediction: {error}")
+        return None, None
