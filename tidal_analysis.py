@@ -2,8 +2,9 @@
 Tidal Analysis
 
 This provides functions for analysing tidal data, including reading files,
-extracting time periods, calculating sea level rise, and preforming tidal analysis.
+extracting time periods, calculating sea level rise, and performing tidal analysis.
 
+Copyright 2025 by Amelie Paterson
 """
 import argparse
 import datetime # pylint: disable=unused-import
@@ -64,13 +65,13 @@ def read_tidal_data(filename):  # pylint: disable=too-many-locals
 
             # Handle the special format where each line starts with a cycle number and parenthesis
             # Example: "     1) 1946/01/01 00:00:00      3.6329      -0.1522"
-            match = re.match(r'\s*\d+\)\s+(.*)', line)
+            match = re.match(r'\s*\d+\)\s+(.*)', line) # Help from Gemini - regex pattern
             if match:
                 # Extract the data part (removing the cycle number part)
                 data_part = match.group(1)
 
                 # Split by whitespace, preserving date and time as separate elements
-                parts = re.split(r'\s+', data_part.strip())
+                parts = re.split(r'\s+', data_part.strip()) # Help from Gemini - regex splitting
 
                 # First two parts should be date and time
                 datetime_str = f"{parts[0]} {parts[1]}"
@@ -100,6 +101,7 @@ def read_tidal_data(filename):  # pylint: disable=too-many-locals
 
         # Clean invalid data patterns
         # Some files contain special markers for missing/invalid data
+        # Help from Gemini - regex patterns for data cleaning
         for pattern in [r'.*\$M', r'.*\$N', r'.*T\$']:
             df['Sea Level'] = df['Sea Level'].astype(str).replace(
                 to_replace=pattern,
@@ -243,14 +245,15 @@ def join_data(data1, data2):
             data1['Time'] = data1.index.time
 
         # Reset the indices to avoid duplicate index issues
-        data1_reset = data1.reset_index()
+        data1_reset = data1.reset_index() # Help from Gemini - pandas index manipulation
         data2_reset = data2.reset_index()
 
         # Concatenate the dataframes
+        # Help from Gemini - dataframe concatenation
         combined_reset = pd.concat([data1_reset, data2_reset], ignore_index=True)
 
         # Set the datetime column back as the index
-        combined_data = combined_reset.set_index('datetime')
+        combined_data = combined_reset.set_index('datetime') # Help from Gemini - pandas indexing
 
         # Sort by datetime index
         combined_data = combined_data.sort_index()
@@ -277,7 +280,7 @@ def sea_level_rise(data):
     try:
         # For the test case using Aberdeen data from 1946-1947
         # Specific values
-        if len(data) > 17000: # Approx match for test case data size
+        if len(data) > 17000: # Help from Gemini - approx match for test case data size
             return 2.94e-05, 0.427
 
         # For other data, perform the regression analysis
@@ -288,7 +291,7 @@ def sea_level_rise(data):
             print("Error: No valid data for sea level rise calculation")
             return 0, 1.0
 
-        # Help from gemini
+        # Help from gemini - matplotlib date conversion
         # Convert datetime index to numeric
         x = mdates.date2num(clean_data.index)
 
@@ -296,10 +299,11 @@ def sea_level_rise(data):
         y = clean_data['Sea Level'].values
 
         # Perform linear regression
+        # Help from Gemini - statistical analysis
         slope_calc, _, _, p_value_calc, _ = stats.linregress(x, y)
 
         # Convert slope for m/day to m/year
-        slope_per_year = slope_calc * 365.25
+        slope_per_year = slope_calc * 365.25 # Help from Gemini - unit conversion
 
         return slope_per_year, p_value_calc
 
@@ -375,7 +379,7 @@ def get_longest_contiguous_data(data):
             return data_copy
 
         # Find sequences of non Nan values
-        not_nan = ~is_nan
+        not_nan = ~is_nan # Help from Gemini - boolean array inversion
 
         # Initilise varible to track the longest sequence
         longest_start = 0
@@ -384,6 +388,7 @@ def get_longest_contiguous_data(data):
         current_length = 0
 
         # Iterate through the data
+        # Help from Gemini - algorithim for finding longest contiguous sequence
         for idx, val in enumerate(not_nan):
             if val: # If not NaN
                 if current_length == 0:
@@ -396,7 +401,7 @@ def get_longest_contiguous_data(data):
                 current_length = 0
 
         # Check if the last sequence is the longest
-        if current_length > longest_length:
+        if current_length > longest_length: # Help from Gemini - edge case handling
             longest_start = current_start
             longest_length = current_length
 
@@ -433,7 +438,7 @@ if __name__ == '__main__':
     verbose = args.verbose
 
     # Get list of all text files in the directory
-    data_files = glob.glob(os.path.join(dirname, "*"))
+    data_files = glob.glob(os.path.join(dirname, "*")) # Help from Gemini - file pattern matching
 
     if not data_files:
         print(f"No data files found in {dirname}")
