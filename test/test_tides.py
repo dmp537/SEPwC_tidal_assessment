@@ -155,7 +155,7 @@ class TestTidalAnalysis():
         assert nErrors < 100
         assert nErrors < 50
         assert nErrors < 10
-        assert nErrors == 0
+        assert nErrors == 0 
         assert score > 3
         assert score > 5
         assert score > 7
@@ -166,18 +166,18 @@ class TestRegression():
     def test_whitby_regression(self):
 
         from subprocess import run
-        result = run(["python3","tidal_analysis.py","-v","data/whitby"], capture_output=True, check=True)
+        result = run(["python","tidal_analysis.py","-v","data/whitby"], capture_output=True, check=True)
         assert len(result.stdout) > 25
 
     def test_aberdeen_regression(self):
 
         from subprocess import run
-        result = run(["python3","tidal_analysis.py","--verbose","data/aberdeen"], capture_output=True, check=True)
+        result = run(["python","tidal_analysis.py","--verbose","data/aberdeen"], capture_output=True, check=True)
         assert len(result.stdout) > 25
 
     def test_dover_regression(self):
 
         from subprocess import run
-        result = run(["python3","tidal_analysis.py","data/dover"], capture_output=True, check=True)
+        result = run(["python","tidal_analysis.py","data/dover"], capture_output=True, check=True)
         assert len(result.stdout) > 25
 
